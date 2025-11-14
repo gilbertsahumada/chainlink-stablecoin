@@ -17,7 +17,7 @@
 # ==========================================================================
 staging-settings:
   user-workflow:
-    workflow-name: "liquidate-staging"
+    workflow-name: "my-workflow-staging"
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.staging.json"
@@ -27,7 +27,7 @@ staging-settings:
 # ==========================================================================
 production-settings:
   user-workflow:
-    workflow-name: "liquidate-production"
+    workflow-name: "my-workflow-production"
   workflow-artifacts:
     workflow-path: "./main.ts"
     config-path: "./config.production.json"
