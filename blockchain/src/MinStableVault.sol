@@ -18,7 +18,7 @@ interface AggregatorV3Interface {
 // --------------------------------------------------------------------------------------------------|
 // ------------ MiniStableVault Contract ------------------------------------------------------------|
 // MiniStableVault is a stablecoin that is backed by a collateral asset and minted as debt  ---------|
-// This contract is for educational purposes only and is not suitable for production ----------------|
+// This contract is for educational purposes only and is not suitable for production -------------------|
 // --------------------------------------------------------------------------------------------------|
 contract MiniStableVault is ERC20 {
   struct Position {
@@ -123,16 +123,12 @@ contract MiniStableVault is ERC20 {
     Position storage pos = positions[id];
     require(pos.open, "Position closed");
     require(healthFactor(id) < minHF, "Position healthy");
-
+    require(balanceOf(msg.sender) >= pos.debt, "Insufficient balance");
     pos.open = false;
-
-    // debt is simply removed -> burn caller's stablecoins
-    _transfer(msg.sender, address(this), pos.debt);
-    _burn(address(this), pos.debt);
-
+    _burn(msg.sender, pos.debt);
     emit PositionLiquidated(id, msg.sender);
   } 
-
+  
   // withdraw collateral after debt is cleared
   function withdraw(uint256 id) external {
     Position storage pos = positions[id];
