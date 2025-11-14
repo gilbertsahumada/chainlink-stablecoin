@@ -117,9 +117,15 @@ contract MiniStableVault is ERC20 {
     Position storage pos = positions[id];
     require(pos.open, "Position closed");
     require(healthFactor(id) < minHF, "Position healthy");
+
+    uint256 debt = pos.debt;
     require(balanceOf(msg.sender) >= pos.debt, "Insufficient balance");
+
     pos.open = false;
-    _burn(msg.sender, pos.debt);
+    pos.debt = 0;
+
+    // Burn the liquidator's stablecoins to pay for the debt
+    _burn(msg.sender, debt);
     emit PositionLiquidated(id, msg.sender);
   } 
   
