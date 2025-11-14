@@ -3,7 +3,6 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-
 // ------------------------------------------------------------------------------|
 // ------------  Chainlink Price Feed Interface ---------------------------------|
 // This interface is used to get the latest price of the collateral asset        |
@@ -18,7 +17,7 @@ interface AggregatorV3Interface {
 // --------------------------------------------------------------------------------------------------|
 // ------------ MiniStableVault Contract ------------------------------------------------------------|
 // MiniStableVault is a stablecoin that is backed by a collateral asset and minted as debt  ---------|
-// This contract is for educational purposes only and is not suitable for production -------------------|
+// This contract is for educational purposes only and is not suitable for production ----------------|
 // --------------------------------------------------------------------------------------------------|
 contract MiniStableVault is ERC20 {
   struct Position {
@@ -53,10 +52,6 @@ contract MiniStableVault is ERC20 {
     oracleDecimals = priceFeed.decimals();
   }
 
-  // -------------------
-  // ---- Utilities ----
-  // -------------------
-
   // Get latest price of collateral in USD with priceFeedDecimals
   function _getLatestPrice() internal view returns (uint256 price) {
     (, int256 answer, , uint256 updatedAt, ) = priceFeed.latestRoundData();
@@ -78,7 +73,6 @@ contract MiniStableVault is ERC20 {
   }
 
   // --- core actions ---
-
   // user approve collateral first
   function openPosition(uint256 mintAmount) external payable returns (uint256 id){
     require(msg.value > 0, "no collateral");
