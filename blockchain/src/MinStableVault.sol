@@ -3,6 +3,11 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+
+// ------------------------------------------------------------------------------|
+// ------------  Chainlink Price Feed Interface ---------------------------------|
+// This interface is used to get the latest price of the collateral asset        |
+// ------------------------------------------------------------------------------|
 interface AggregatorV3Interface {
     function latestRoundData() external view returns (
         uint80, int256 answer, uint256, uint256, uint80
@@ -10,6 +15,11 @@ interface AggregatorV3Interface {
     function decimals() external view returns(uint8);
 }
 
+// --------------------------------------------------------------------------------------------------|
+// ------------ MiniStableVault Contract ------------------------------------------------------------|
+// MiniStableVault is a stablecoin that is backed by a collateral asset and minted as debt  ---------|
+// This contract is for educational purposes only and is not suitable for production ----------------|
+// --------------------------------------------------------------------------------------------------|
 contract MiniStableVault is ERC20 {
   struct Position {
     address owner;
@@ -57,7 +67,7 @@ contract MiniStableVault is ERC20 {
   function collateralUsd(uint256 amount) public view returns (uint256) {
     uint256 price = _getLatestPrice();
     // USD scaled 1e18;
-    return amount * price * 1e18 / (10**18) / (10**oracleDecimals);
+    return amount * price / (10**oracleDecimals);
   }
 
   function healthFactor(uint256 id) public view returns(uint256) {
@@ -93,6 +103,7 @@ contract MiniStableVault is ERC20 {
     require(healthFactor(id) >= minHF, "Position unhealthy");
 
     uint256 debt = pos.debt;
+    uint256 collateral = pos.collateralAmount;
     require(balanceOf(msg.sender) >= debt, "Insufficient balance");
 
     pos.open = false;
@@ -102,7 +113,7 @@ contract MiniStableVault is ERC20 {
     _burn(msg.sender, debt);
 
     // Transfer collateral to owner
-    payable(msg.sender).transfer(pos.collateralAmount);
+    payable(msg.sender).transfer(collateral);
 
     emit PositionClosed(id, msg.sender);
   }
