@@ -6,6 +6,9 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 // ------------------------------------------------------------------------------|
 // ------------  Chainlink Price Feed Interface ---------------------------------|
 // This interface is used to get the latest price of the collateral asset        |
+// Address: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+// Network: Ethereum Sepolia Testnet
+// Pair: ETH/USD
 // ------------------------------------------------------------------------------|
 interface AggregatorV3Interface {
     function latestRoundData() external view returns (
