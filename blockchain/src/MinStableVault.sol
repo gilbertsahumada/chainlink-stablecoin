@@ -57,6 +57,12 @@ contract MiniStableVault is ERC20 {
     /// @notice Number of decimals used by the price feed oracle
     uint8 public oracleDecimals;
 
+    /// @notice Mock price mode (for workshop/demo purposes)
+    bool public mockPriceEnabled;
+
+    /// @notice Mock price value (with oracle decimals)
+    uint256 public mockPrice;
+
     // ========================================================================
     // Events
     // ========================================================================
@@ -69,6 +75,9 @@ contract MiniStableVault is ERC20 {
     /// @notice Emitted when a position is liquidated
     event PositionLiquidated(uint256 indexed id, address indexed liquidator);
 
+    /// @notice Emitted when mock price is enabled/disabled
+    event MockPriceToggled(bool enabled, uint256 price);
+
     constructor(address _priceFeed) ERC20("MiniUSD", "mUSD") {
         require(_priceFeed != address(0), "Invalid addresses");
         priceFeed = AggregatorV3Interface(_priceFeed);
@@ -79,9 +88,16 @@ contract MiniStableVault is ERC20 {
     // Internal Helper Functions
     // ========================================================================
 
-    /// @notice Get the latest price from Chainlink oracle
+    /// @notice Get the latest price from Chainlink oracle or mock price if enabled
     /// @return price The price in USD with oracle decimals (typically 8)
     function _getLatestPrice() internal view returns (uint256 price) {
+        // If mock price is enabled, return the mock price
+        if (mockPriceEnabled) {
+            require(mockPrice > 0, "mock price not set");
+            return mockPrice;
+        }
+
+        // Otherwise, get price from oracle
         (, int256 answer,, uint256 updatedAt,) = priceFeed.latestRoundData();
         require(answer > 0 && updatedAt != 0, "invalid price");
         return uint256(answer);
@@ -120,6 +136,35 @@ contract MiniStableVault is ERC20 {
         if (!pos.open || pos.debt == 0) return type(uint256).max;
         uint256 usd = collateralUsd(pos.collateralAmount);
         return (usd * 1e18) / pos.debt;
+    }
+
+    // ========================================================================
+    // Mock Price Functions (for workshop/demo)
+    // ========================================================================
+
+    /// @notice Enable mock price mode and set a custom price
+    /// @dev This is for workshop/demo purposes to simulate price changes
+    /// @param _price Price in USD with oracle decimals (e.g., 1550e8 for $1550)
+    function enableMockPrice(uint256 _price) external {
+        require(_price > 0, "price must be > 0");
+        mockPrice = _price;
+        mockPriceEnabled = true;
+        emit MockPriceToggled(true, _price);
+    }
+
+    /// @notice Disable mock price mode and return to using real oracle
+    function disableMockPrice() external {
+        mockPriceEnabled = false;
+        emit MockPriceToggled(false, 0);
+    }
+
+    /// @notice Update mock price while mock mode is enabled
+    /// @param _price New price in USD with oracle decimals
+    function setMockPrice(uint256 _price) external {
+        require(mockPriceEnabled, "mock price not enabled");
+        require(_price > 0, "price must be > 0");
+        mockPrice = _price;
+        emit MockPriceToggled(true, _price);
     }
 
     // ========================================================================
