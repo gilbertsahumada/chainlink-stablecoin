@@ -32,6 +32,7 @@ contract MiniStableVault is ERC20 {
 
   // Events for CRE / Supabase Indexing
   event PositionOpened(uint256 indexed id, address indexed owner, uint256 collateralAmount, uint256 minted);
+  event PositionClosed(uint256 indexed id, address indexed owner);
   event PositionLiquidated(uint256 indexed id, address indexed liquidator);
 
   constructor(
@@ -83,6 +84,27 @@ contract MiniStableVault is ERC20 {
     _mint(msg.sender, mintAmount);
     
     emit PositionOpened(id, msg.sender, msg.value, mintAmount);
+  }
+
+  function closePosition(uint256 id) external {
+    Position storage pos = positions[id];
+    require(pos.open, "Position closed");
+    require(pos.owner == msg.sender, "Only owner can close");
+    require(healthFactor(id) >= minHF, "Position unhealthy");
+
+    uint256 debt = pos.debt;
+    require(balanceOf(msg.sender) >= debt, "Insufficient balance");
+
+    pos.open = false;
+    pos.collateralAmount = 0;
+
+    // Burn debt
+    _burn(msg.sender, debt);
+
+    // Transfer collateral to owner
+    payable(msg.sender).transfer(pos.collateralAmount);
+
+    emit PositionClosed(id, msg.sender);
   }
 
   // anyone can liquidate if HF < minHF
