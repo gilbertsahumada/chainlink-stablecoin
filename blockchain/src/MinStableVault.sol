@@ -72,6 +72,21 @@ contract MiniStableVault is ERC20 {
         return (amount * price) / (10 ** oracleDecimals);
     }
 
+    // Calculate how much ETH (in wei) is needed to mint a specific amount of stablecoin
+    // @param mintAmount: Amount of stablecoin to mint (in 18 decimals, e.g., 1e18 for 1 USD)
+    // @return: Amount of ETH needed in wei
+    function ethNeededForMint(uint256 mintAmount) public view returns (uint256) {
+        uint256 price = _getLatestPrice();
+        
+        // Calculate required collateral in USD (with minHF)
+        // collateralUSD = mintAmount * minHF / 1e18
+        uint256 collateralUsdNeeded = (mintAmount * minHF) / 1e18;
+        
+        // Convert USD to ETH: ETH = (USD * 10^oracleDecimals * 1e18) / price
+        // Result in wei (18 decimals)
+        return (collateralUsdNeeded * (10 ** oracleDecimals) * 1e18) / price;
+    }
+
     function healthFactor(uint256 id) public view returns (uint256) {
         Position memory pos = positions[id];
         if (!pos.open || pos.debt == 0) return type(uint256).max;
