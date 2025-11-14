@@ -3,26 +3,32 @@ pragma solidity ^0.8.27;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-// ------------------------------------------------------------------------------|
-// ------------  Chainlink Price Feed Interface ---------------------------------|
-// This interface is used to get the latest price of the collateral asset        |
-// Address: 0x694AA1769357215DE4FAC081bf1f309aDC325306
-// Network: Ethereum Sepolia Testnet
-// Pair: ETH/USD
-// ------------------------------------------------------------------------------|
+// ==============================================================================
+// Chainlink Price Feed Interface
+// ==============================================================================
+// This interface is used to get the latest price of the collateral asset (ETH)
+//
+// Oracle Details:
+//   - Address: 0x694AA1769357215DE4FAC081bf1f309aDC325306
+//   - Network: Ethereum Sepolia Testnet
+//   - Pair: ETH/USD
+//   - Decimals: 8
+// ==============================================================================
 interface AggregatorV3Interface {
-    function latestRoundData()
-        external
-        view
-        returns (uint80, int256 answer, uint256, uint256, uint80);
+    function latestRoundData() external view returns (uint80, int256 answer, uint256, uint256, uint80);
     function decimals() external view returns (uint8);
 }
 
-// --------------------------------------------------------------------------------------------------|
-// ------------ MiniStableVault Contract ------------------------------------------------------------|
-// MiniStableVault is a stablecoin that is backed by a collateral asset and minted as debt  ---------|
-// This contract is for educational purposes only and is not suitable for production ----------------|
-// --------------------------------------------------------------------------------------------------|
+// ==============================================================================
+// MiniStableVault Contract
+// ==============================================================================
+// A stablecoin (mUSD) that is backed by ETH collateral and minted as debt.
+// Users can deposit ETH as collateral and mint stablecoins up to a certain
+// collateralization ratio (minimum health factor of 1.2 = 120%).
+//
+// WARNING: This contract is for educational/demo purposes only and is NOT
+//          suitable for production use.
+// ==============================================================================
 contract MiniStableVault is ERC20 {
     struct Position {
         address owner;
@@ -31,26 +37,36 @@ contract MiniStableVault is ERC20 {
         bool open;
     }
 
-    // -- state --
+    // ========================================================================
+    // State Variables
+    // ========================================================================
+
+    /// @notice Chainlink price feed for ETH/USD
     AggregatorV3Interface public immutable priceFeed;
 
-    //position storage
+    /// @notice Next position ID to be assigned
     uint256 public nextPositionId = 1;
+
+    /// @notice Mapping of position ID to Position struct
     mapping(uint256 => Position) public positions;
 
-    // HF required = 1.2 => 120% (scale 1e18)
+    /// @notice Minimum health factor required (1.2 = 120% collateralization)
+    /// @dev Scaled by 1e18 (1.2e18 = 120%)
     uint256 public minHF = 1.2e18;
 
+    /// @notice Number of decimals used by the price feed oracle
     uint8 public oracleDecimals;
 
-    // Events for CRE / Supabase Indexing
-    event PositionOpened(
-        uint256 indexed id,
-        address indexed owner,
-        uint256 collateralAmount,
-        uint256 minted
-    );
+    // ========================================================================
+    // Events
+    // ========================================================================
+
+    /// @notice Emitted when a new position is opened
+    event PositionOpened(uint256 indexed id, address indexed owner, uint256 collateralAmount, uint256 minted);
+    /// @notice Emitted when a position is closed by the owner
     event PositionClosed(uint256 indexed id, address indexed owner);
+
+    /// @notice Emitted when a position is liquidated
     event PositionLiquidated(uint256 indexed id, address indexed liquidator);
 
     constructor(address _priceFeed) ERC20("MiniUSD", "mUSD") {
@@ -59,34 +75,46 @@ contract MiniStableVault is ERC20 {
         oracleDecimals = priceFeed.decimals();
     }
 
-    // Get latest price of collateral in USD with priceFeedDecimals
+    // ========================================================================
+    // Internal Helper Functions
+    // ========================================================================
+
+    /// @notice Get the latest price from Chainlink oracle
+    /// @return price The price in USD with oracle decimals (typically 8)
     function _getLatestPrice() internal view returns (uint256 price) {
-        (, int256 answer, , uint256 updatedAt, ) = priceFeed.latestRoundData();
+        (, int256 answer,, uint256 updatedAt,) = priceFeed.latestRoundData();
         require(answer > 0 && updatedAt != 0, "invalid price");
         return uint256(answer);
     }
 
+    /// @notice Calculate the USD value of a given amount of ETH
+    /// @param amount Amount of ETH in wei (18 decimals)
+    /// @return The USD value scaled by 1e18
     function collateralUsd(uint256 amount) public view returns (uint256) {
         uint256 price = _getLatestPrice();
-        // USD scaled 1e18;
+        // Convert: (ETH in wei * price with oracle decimals) / oracle decimals
+        // Result is in USD with 18 decimals
         return (amount * price) / (10 ** oracleDecimals);
     }
 
-    // Calculate how much ETH (in wei) is needed to mint a specific amount of stablecoin
-    // @param mintAmount: Amount of stablecoin to mint (in 18 decimals, e.g., 1e18 for 1 USD)
-    // @return: Amount of ETH needed in wei
+    /// @notice Calculate how much ETH (in wei) is needed to mint a specific amount of stablecoin
+    /// @param mintAmount Amount of stablecoin to mint (in 18 decimals, e.g., 1e18 for 1 USD)
+    /// @return Amount of ETH needed in wei to meet the minimum health factor requirement
     function ethNeededForMint(uint256 mintAmount) public view returns (uint256) {
         uint256 price = _getLatestPrice();
-        
+
         // Calculate required collateral in USD (with minHF)
         // collateralUSD = mintAmount * minHF / 1e18
         uint256 collateralUsdNeeded = (mintAmount * minHF) / 1e18;
-        
+
         // Convert USD to ETH: ETH = (USD * 10^oracleDecimals * 1e18) / price
         // Result in wei (18 decimals)
         return (collateralUsdNeeded * (10 ** oracleDecimals) * 1e18) / price;
     }
 
+    /// @notice Calculate the health factor of a position
+    /// @param id Position ID
+    /// @return Health factor scaled by 1e18 (1.2e18 = 120%). Returns max uint256 if position is closed or has no debt
     function healthFactor(uint256 id) public view returns (uint256) {
         Position memory pos = positions[id];
         if (!pos.open || pos.debt == 0) return type(uint256).max;
@@ -94,11 +122,15 @@ contract MiniStableVault is ERC20 {
         return (usd * 1e18) / pos.debt;
     }
 
-    // --- core actions ---
-    // user approve collateral first
-    function openPosition(
-        uint256 mintAmount
-    ) external payable returns (uint256 id) {
+    // ========================================================================
+    // Core Functions
+    // ========================================================================
+
+    /// @notice Open a new position by depositing ETH as collateral and minting stablecoins
+    /// @dev User must send ETH as msg.value. The amount must meet the minimum health factor.
+    /// @param mintAmount Amount of stablecoins to mint (in 18 decimals)
+    /// @return id The ID of the newly created position
+    function openPosition(uint256 mintAmount) external payable returns (uint256 id) {
         require(msg.value > 0, "no collateral");
         require(mintAmount > 0, "No Mint");
 
@@ -114,7 +146,9 @@ contract MiniStableVault is ERC20 {
         emit PositionOpened(id, msg.sender, msg.value, mintAmount);
     }
 
-    // Check if a position needs to be liquidated
+    /// @notice Check if a position needs to be liquidated
+    /// @param id Position ID
+    /// @return true if the position's health factor is below the minimum threshold
     function needsLiquidation(uint256 id) external view returns (bool) {
         Position memory pos = positions[id];
 
@@ -133,6 +167,9 @@ contract MiniStableVault is ERC20 {
         return hf < minHF;
     }
 
+    /// @notice Close a position by burning the debt and returning the collateral
+    /// @dev Position must be healthy (HF >= minHF) and caller must be the owner
+    /// @param id Position ID to close
     function closePosition(uint256 id) external {
         Position storage pos = positions[id];
         require(pos.open, "Position closed");
@@ -155,7 +192,10 @@ contract MiniStableVault is ERC20 {
         emit PositionClosed(id, msg.sender);
     }
 
-    // anyone can liquidate if HF < minHF
+    /// @notice Liquidate a position that is below the minimum health factor
+    /// @dev Anyone can call this function. The liquidator burns their stablecoins to pay the debt.
+    ///      The collateral remains in the contract and can be withdrawn by the position owner.
+    /// @param id Position ID to liquidate
     function liquidate(uint256 id) external {
         Position storage pos = positions[id];
         require(pos.open, "Position closed");
@@ -172,7 +212,9 @@ contract MiniStableVault is ERC20 {
         emit PositionLiquidated(id, msg.sender);
     }
 
-    // withdraw collateral after debt is cleared
+    /// @notice Withdraw collateral after a position has been liquidated
+    /// @dev Only the position owner can withdraw. Position must be closed (liquidated).
+    /// @param id Position ID to withdraw collateral from
     function withdraw(uint256 id) external {
         Position storage pos = positions[id];
         require(pos.open == false, "Position still open");
