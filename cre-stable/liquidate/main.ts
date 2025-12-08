@@ -35,8 +35,6 @@ const configSchema = z.object({
 type Config = z.infer<typeof configSchema>;
 
 const onCronTrigger = (runtime: Runtime<Config>): boolean => {
-  //runtime.log("Hello world! Workflow triggered.");
-  //return "Hello world!";
   return isPositionLiquidatable(runtime, runtime.config.evms[0]);
 };
 

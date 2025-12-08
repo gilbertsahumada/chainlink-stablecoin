@@ -83,20 +83,19 @@ contract MinStableVaultTest is Test {
 
     function test_EthNeededForMint_1USD_ReturnsValue() public view {
         // To mint 1 USD, we need enough ETH for 1.2 USD (minHF = 1.2)
-        uint256 ethNeeded = vault.ethNeededForMint(ONE_USD);
+        uint256 ethNeeded = vault.ethNeededForMint(1); // 1 USD (human-readable)
         
         // Just verify it returns a value (the exact calculation is complex due to contract formula)
         assertGt(ethNeeded, 0, "ETH needed should be greater than 0");
     }
 
     function test_EthNeededForMint_100USD_ReturnsValue() public view {
-        // To mint 100 USD
-        uint256 mintAmount = 100 * ONE_USD;
-        uint256 ethNeeded = vault.ethNeededForMint(mintAmount);
+        // To mint 100 USD (human-readable)
+        uint256 ethNeeded = vault.ethNeededForMint(100);
         
         // Verify it returns a value and is roughly 100x the 1 USD amount
         assertGt(ethNeeded, 0, "ETH needed should be greater than 0");
-        uint256 ethFor1USD = vault.ethNeededForMint(ONE_USD);
+        uint256 ethFor1USD = vault.ethNeededForMint(1);
         assertApproxEqRel(ethNeeded, ethFor1USD * 100, 1e16, "100 USD should need roughly 100x more ETH");
     }
 
@@ -109,11 +108,10 @@ contract MinStableVaultTest is Test {
 
         // For 1 USD, we need collateral worth 1.2 USD (minHF = 1.2)
         // 1.2 USD / $3100 per ETH = 0.000387096... ETH
-        // But the contract formula multiplies by 1e18 extra, so we'll use a direct calculation
         uint256 ethToDeposit = 0.001 ether; // 0.001 ETH should be enough for 1 USD
 
-        // Open position
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(ONE_USD);
+        // Open position with 1 USD (human-readable)
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1);
 
         // Verify position was created
         assertEq(positionId, 1, "Position ID should be 1");
@@ -132,16 +130,16 @@ contract MinStableVaultTest is Test {
     function test_OpenPosition_Mint100USD_WithSufficientCollateral() public {
         vm.startPrank(user);
 
-        uint256 mintAmount = 100 * ONE_USD;
         // For 100 USD, we need collateral worth 120 USD
         // 120 USD / $3100 per ETH = ~0.0387 ETH
         uint256 ethToDeposit = 0.05 ether; // 0.05 ETH should be enough
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        // Open position with 100 USD (human-readable)
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(100);
 
-        assertEq(vault.balanceOf(user), mintAmount, "User should have 100 mUSD");
+        assertEq(vault.balanceOf(user), 100 * ONE_USD, "User should have 100 mUSD");
         (,, uint256 debt,) = vault.positions(positionId);
-        assertEq(debt, mintAmount, "Debt should be 100 USD");
+        assertEq(debt, 100 * ONE_USD, "Debt should be 100 USD");
 
         vm.stopPrank();
     }
@@ -149,11 +147,10 @@ contract MinStableVaultTest is Test {
     function test_OpenPosition_InsufficientCollateral_Reverts() public {
         vm.startPrank(user);
 
-        uint256 mintAmount = 1000 * ONE_USD; // Try to mint 1000 USD
         uint256 insufficientEth = 0.001 ether; // Very little ETH
 
         vm.expectRevert("insufficient collateral");
-        vault.openPosition{value: insufficientEth}(mintAmount);
+        vault.openPosition{value: insufficientEth}(1000); // Try to mint 1000 USD
 
         vm.stopPrank();
     }
@@ -165,10 +162,9 @@ contract MinStableVaultTest is Test {
     function test_HealthFactor_NewPosition_ShouldBeAboveMin() public {
         vm.startPrank(user);
 
-        uint256 mintAmount = ONE_USD;
         uint256 ethToDeposit = 0.001 ether; // Enough for 1 USD
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1); // 1 USD
 
         uint256 hf = vault.healthFactor(positionId);
         uint256 minHF = vault.minHF();
@@ -182,10 +178,9 @@ contract MinStableVaultTest is Test {
         vm.startPrank(user);
 
         // Open position with 1 USD debt
-        uint256 mintAmount = ONE_USD;
         uint256 ethToDeposit = 0.001 ether; // Enough for 1 USD
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1); // 1 USD
         uint256 hfBefore = vault.healthFactor(positionId);
 
         // Drop price by 70% (from $3100 to $930) to make it unhealthy
@@ -206,10 +201,9 @@ contract MinStableVaultTest is Test {
     function test_NeedsLiquidation_HealthyPosition_ReturnsFalse() public {
         vm.startPrank(user);
 
-        uint256 mintAmount = ONE_USD;
         uint256 ethToDeposit = 0.001 ether; // Enough for 1 USD
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1); // 1 USD
 
         assertFalse(vault.needsLiquidation(positionId), "Healthy position should not need liquidation");
 
@@ -220,10 +214,9 @@ contract MinStableVaultTest is Test {
         vm.startPrank(user);
 
         // Open position
-        uint256 mintAmount = ONE_USD;
         uint256 ethToDeposit = 0.001 ether; // Enough for 1 USD
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1); // 1 USD
 
         // Drop price by 70% to make it unhealthy
         priceFeed.setPrice(int256(ETH_PRICE_8_DECIMALS * 30 / 100));
@@ -237,16 +230,15 @@ contract MinStableVaultTest is Test {
         vm.startPrank(user);
 
         // Open position
-        uint256 mintAmount = ONE_USD;
         uint256 ethToDeposit = 0.001 ether; // Enough for 1 USD
 
-        uint256 positionId = vault.openPosition{value: ethToDeposit}(mintAmount);
+        uint256 positionId = vault.openPosition{value: ethToDeposit}(1); // 1 USD
 
         vm.stopPrank();
 
         // Liquidator opens position first (before price drop)
         vm.startPrank(liquidator);
-        vault.openPosition{value: 1 ether}(100 * ONE_USD);
+        vault.openPosition{value: 1 ether}(100); // 100 USD
         vm.stopPrank();
 
         // Now drop price by 70% to make position unhealthy
@@ -270,7 +262,7 @@ contract MinStableVaultTest is Test {
     function test_OpenPosition_ZeroValue_Reverts() public {
         vm.startPrank(user);
         vm.expectRevert("no collateral");
-        vault.openPosition{value: 0}(ONE_USD);
+        vault.openPosition{value: 0}(1); // 1 USD
         vm.stopPrank();
     }
 

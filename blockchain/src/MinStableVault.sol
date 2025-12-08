@@ -114,10 +114,13 @@ contract MiniStableVault is ERC20 {
     }
 
     /// @notice Calculate how much ETH (in wei) is needed to mint a specific amount of stablecoin
-    /// @param mintAmount Amount of stablecoin to mint (in 18 decimals, e.g., 1e18 for 1 USD)
+    /// @param usdAmount Amount of stablecoin to mint in USD (e.g., 10 for 10 USD, will be converted to 10e18 internally)
     /// @return Amount of ETH needed in wei to meet the minimum health factor requirement
-    function ethNeededForMint(uint256 mintAmount) public view returns (uint256) {
+    function ethNeededForMint(uint256 usdAmount) public view returns (uint256) {
         uint256 price = _getLatestPrice();
+
+        // Convert human-readable USD amount to wei (10 USD = 10e18 wei)
+        uint256 mintAmount = usdAmount * 1e18;
 
         // Calculate required collateral in USD (with minHF)
         // collateralUSD = mintAmount * minHF / 1e18
@@ -173,11 +176,14 @@ contract MiniStableVault is ERC20 {
 
     /// @notice Open a new position by depositing ETH as collateral and minting stablecoins
     /// @dev User must send ETH as msg.value. The amount must meet the minimum health factor.
-    /// @param mintAmount Amount of stablecoins to mint (in 18 decimals)
+    /// @param usdAmount Amount of stablecoins to mint in USD (e.g., 20 for 20 USD, will be converted to 20e18 internally)
     /// @return id The ID of the newly created position
-    function openPosition(uint256 mintAmount) external payable returns (uint256 id) {
+    function openPosition(uint256 usdAmount) external payable returns (uint256 id) {
         require(msg.value > 0, "no collateral");
-        require(mintAmount > 0, "No Mint");
+        require(usdAmount > 0, "No Mint");
+
+        // Convert human-readable USD amount to wei (20 USD = 20e18 wei)
+        uint256 mintAmount = usdAmount * 1e18;
 
         // check collateralization
         uint256 usd = collateralUsd(msg.value);
