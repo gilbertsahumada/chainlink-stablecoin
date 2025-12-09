@@ -27,7 +27,7 @@ interface AggregatorV3Interface {
 // collateralization ratio (minimum health factor of 1.2 = 120%).
 //
 // WARNING: This contract is for educational/demo purposes only and is NOT
-//          suitable for production use.
+//          suitable for production use. Logic is simplified.
 // ==============================================================================
 contract MiniStableVault is ERC20 {
     struct Position {
