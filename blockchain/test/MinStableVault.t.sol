@@ -38,6 +38,15 @@ contract MinStableVaultTest is Test {
     MiniStableVault public vault;
     MockPriceFeed public priceFeed;
 
+    /// @dev helper to mirror ethNeededForMint math (includes minHF)
+    function _expectedEthNeeded(uint256 usdAmount) internal view returns (uint256) {
+        uint256 price = uint256(priceFeed.price());
+        uint256 oracleDecimals = priceFeed.decimals();
+        uint256 mintAmount = usdAmount * 1e18;
+        uint256 collateralUsdNeeded = (mintAmount * vault.minHF()) / 1e18;
+        return (collateralUsdNeeded * (10 ** oracleDecimals)) / price;
+    }
+
     // Test constants
     uint256 public constant ETH_PRICE_USD = 3100; // $3100 per ETH
     uint256 public constant ETH_PRICE_8_DECIMALS = 3100 * 1e8; // Price with 8 decimals
@@ -84,19 +93,17 @@ contract MinStableVaultTest is Test {
     function test_EthNeededForMint_1USD_ReturnsValue() public view {
         // To mint 1 USD, we need enough ETH for 1.2 USD (minHF = 1.2)
         uint256 ethNeeded = vault.ethNeededForMint(1); // 1 USD (human-readable)
-        
-        // Just verify it returns a value (the exact calculation is complex due to contract formula)
-        assertGt(ethNeeded, 0, "ETH needed should be greater than 0");
+
+        uint256 expected = _expectedEthNeeded(1);
+        assertEq(ethNeeded, expected, "ETH needed should include minHF");
     }
 
     function test_EthNeededForMint_100USD_ReturnsValue() public view {
         // To mint 100 USD (human-readable)
         uint256 ethNeeded = vault.ethNeededForMint(100);
         
-        // Verify it returns a value and is roughly 100x the 1 USD amount
-        assertGt(ethNeeded, 0, "ETH needed should be greater than 0");
-        uint256 ethFor1USD = vault.ethNeededForMint(1);
-        assertApproxEqRel(ethNeeded, ethFor1USD * 100, 1e16, "100 USD should need roughly 100x more ETH");
+        uint256 expected = _expectedEthNeeded(100);
+        assertEq(ethNeeded, expected, "ETH needed should include minHF");
     }
 
     // ========================================================================
@@ -273,4 +280,3 @@ contract MinStableVaultTest is Test {
         vm.stopPrank();
     }
 }
-

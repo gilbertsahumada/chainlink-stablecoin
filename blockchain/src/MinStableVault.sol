@@ -15,7 +15,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 //   - Decimals: 8
 // ==============================================================================
 interface AggregatorV3Interface {
-    function latestRoundData() external view returns (uint80, int256 answer, uint256, uint256, uint80);
+    function latestRoundData()
+        external
+        view
+        returns (uint80, int256 answer, uint256, uint256, uint80);
     function decimals() external view returns (uint8);
 }
 
@@ -68,7 +71,12 @@ contract MiniStableVault is ERC20 {
     // ========================================================================
 
     /// @notice Emitted when a new position is opened
-    event PositionOpened(uint256 indexed id, address indexed owner, uint256 collateralAmount, uint256 minted);
+    event PositionOpened(
+        uint256 indexed id,
+        address indexed owner,
+        uint256 collateralAmount,
+        uint256 minted
+    );
     /// @notice Emitted when a position is closed by the owner
     event PositionClosed(uint256 indexed id, address indexed owner);
 
@@ -98,7 +106,7 @@ contract MiniStableVault is ERC20 {
         }
 
         // Otherwise, get price from oracle
-        (, int256 answer,, uint256 updatedAt,) = priceFeed.latestRoundData();
+        (, int256 answer, , uint256 updatedAt, ) = priceFeed.latestRoundData();
         require(answer > 0 && updatedAt != 0, "invalid price");
         return uint256(answer);
     }
@@ -126,9 +134,9 @@ contract MiniStableVault is ERC20 {
         // collateralUSD = mintAmount * minHF / 1e18
         uint256 collateralUsdNeeded = (mintAmount * minHF) / 1e18;
 
-        // Convert USD to ETH: ETH = (USD * 10^oracleDecimals * 1e18) / price
+        // Convert USD to ETH: ETH = (USD * 10^oracleDecimals) / price
         // Result in wei (18 decimals)
-        return (collateralUsdNeeded * (10 ** oracleDecimals) * 1e18) / price;
+        return (collateralUsdNeeded * (10 ** oracleDecimals)) / price;
     }
 
     /// @notice Calculate the health factor of a position
@@ -178,7 +186,9 @@ contract MiniStableVault is ERC20 {
     /// @dev User must send ETH as msg.value. The amount must meet the minimum health factor.
     /// @param usdAmount Amount of stablecoins to mint in USD (e.g., 20 for 20 USD, will be converted to 20e18 internally)
     /// @return id The ID of the newly created position
-    function openPosition(uint256 usdAmount) external payable returns (uint256 id) {
+    function openPosition(
+        uint256 usdAmount
+    ) external payable returns (uint256 id) {
         require(msg.value > 0, "no collateral");
         require(usdAmount > 0, "No Mint");
 
@@ -186,8 +196,8 @@ contract MiniStableVault is ERC20 {
         uint256 mintAmount = usdAmount * 1e18;
 
         // check collateralization
-        uint256 usd = collateralUsd(msg.value);
-        require((usd * 1e18) / mintAmount >= minHF, "insufficient collateral");
+        uint256 ethNeeded = ethNeededForMint(usdAmount);
+        require(msg.value >= ethNeeded, "insufficient collateral");
 
         id = nextPositionId++;
         positions[id] = Position(msg.sender, msg.value, mintAmount, true);
