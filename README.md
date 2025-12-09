@@ -165,7 +165,7 @@ git commit -m "Update OpenZeppelin contracts"
 
 | Network | Contract Address |
 |---------|-----------------|
-| Mainnet | 0x5907d70Dcb0D658801d531F17D3952368f37b182 |
+| Mainnet | 0x8Fb01f3d9c4d0639F200E9ae5B1929fe1563c65a |
 
 
 
