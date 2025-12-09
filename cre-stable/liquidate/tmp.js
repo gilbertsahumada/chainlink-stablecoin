@@ -16500,6 +16500,7 @@ var configSchema = exports_external.object({
   url: exports_external.string(),
   evms: exports_external.array(exports_external.object({
     minStableVaultAddress: exports_external.string(),
+    proxyAddress: exports_external.string(),
     chainSelectorName: exports_external.string(),
     gasLimit: exports_external.string()
   }))

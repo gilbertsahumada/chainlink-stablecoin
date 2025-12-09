@@ -2,8 +2,9 @@
   "schedule": "*/30 * * * * *",
   "evms": [
     {
-      "minStableVaultAddress": "0x5B2FE538d2B2aEE2c5cC8404c3182c362E385Ed0",
+      "minStableVaultAddress": "0x8Fb01f3d9c4d0639F200E9ae5B1929fe1563c65a",
       "proxyAddress": "0x073671aE6EAa2468c203fDE3a79dEe0836adF032",
+      "stableConsumerAddress": "",
       "chainSelectorName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
