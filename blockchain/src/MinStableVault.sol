@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ReceiverTemplate} from "./interfaces/IReceiverTemplate.sol";
 
 // ==============================================================================
 // Chainlink Price Feed Interface
@@ -32,7 +33,7 @@ interface AggregatorV3Interface {
 // WARNING: This contract is for educational/demo purposes only and is NOT
 //          suitable for production use. Logic is simplified.
 // ==============================================================================
-contract MiniStableVault is ERC20 {
+contract MiniStableVault is ERC20, ReceiverTemplate {
     struct Position {
         address owner;
         uint256 collateralAmount;
@@ -257,7 +258,7 @@ contract MiniStableVault is ERC20 {
     /// @dev Anyone can call this function. The liquidator burns their stablecoins to pay the debt.
     ///      The collateral remains in the contract and can be withdrawn by the position owner.
     /// @param id Position ID to liquidate
-    function liquidate(uint256 id) external {
+    function liquidate(uint256 id) public {
         Position storage pos = positions[id];
         require(pos.open, "Position closed");
         require(healthFactor(id) < minHF, "Position healthy");
@@ -284,4 +285,21 @@ contract MiniStableVault is ERC20 {
         pos.collateralAmount = 0;
         payable(msg.sender).transfer(amount);
     }
+
+    function _processReport(bytes calldata report) internal override {
+        // Decode the report to get position ID
+        uint256 positionId = abi.decode(report, (uint256));
+
+        // Attempt to liquidate the position
+        liquidate(positionId);
+    }
 }
+
+
+/*
+  struct CalculatorResult {
+    uint256 offchainValue;
+    int256 onchainValue;
+    uint256 finalResult;
+  }
+*/
