@@ -24,8 +24,7 @@ const configSchema = z.object({
   url: z.string(),
   evms: z.array(
     z.object({
-      minStableVaultAddress: z.string(),
-      proxyAddress: z.string(),
+      mintStableConsumerAddress: z.string(),
       chainSelectorName: z.string(),
       gasLimit: z.string(),
     })
@@ -35,74 +34,19 @@ const configSchema = z.object({
 type Config = z.infer<typeof configSchema>;
 
 const onCronTrigger = (runtime: Runtime<Config>): boolean => {
-  return isPositionLiquidatable(runtime, runtime.config.evms[0]);
+  const { liquidatable, idPosition } = mustBeLiquidated(runtime, runtime.config.evms[0]);
+  if (liquidatable) {
+    return liquidatePosition(runtime, runtime.config.evms[0], idPosition);
+  } else {
+    runtime.log("No positions to liquidate at this time.");
+    return false;
+  }
 };
 
 const liquidatePosition = (
   runtime: Runtime<Config>,
-  evmConfig: Config["evms"][0]
-): string => {
-  try {
-    const network = getNetwork({
-      chainFamily: "evm",
-      chainSelectorName: evmConfig.chainSelectorName,
-      isTestnet: true,
-    });
-
-    if (!network) {
-      throw new Error(
-        `Network not found for chain selector name: ${evmConfig.chainSelectorName}`
-      );
-    }
-
-    const evmClient = new cre.capabilities.EVMClient(
-      network.chainSelector.selector
-    );
-
-    const callData = encodeFunctionData({
-      abi: MiniStableVault,
-      functionName: "liquidate",
-      args: [2n],
-    });
-
-    // Write report
-    const reportResponse = runtime
-      .report({
-        encodedPayload: hexToBase64(callData),
-        encoderName: "evm",
-        signingAlgo: "ecdsa",
-        hashingAlgo: "keccak256",
-      })
-      .result();
-
-    const resp = evmClient
-      .writeReport(runtime, {
-        receiver: evmConfig.proxyAddress as Address,
-        report: reportResponse,
-        gasConfig: {
-          gasLimit: evmConfig.gasLimit,
-        },
-      })
-      .result();
-
-      const txtStatus = resp.txStatus;
-      if (txtStatus !== TxStatus.SUCCESS) {
-        throw new Error(`Failed to write report: ${resp.errorMessage || txtStatus}`);
-      }
-
-      const txHash = resp.txHash || new Uint8Array(32);
-      runtime.log(`Liquidate transaction succeeded at txHash: ${bytesToHex(txHash)}`);
-
-    return "Liquidated";
-  } catch (error) {
-    runtime.log(`Error in liquidatePosition: ${error}`);
-    return "Error in liquidatePosition";
-  }
-};
-
-const isPositionLiquidatable = (
-  runtime: Runtime<Config>,
-  evmConfig: Config["evms"][0]
+  evmConfig: Config["evms"][0],
+  idPosition: bigint
 ): boolean => {
   try {
     const network = getNetwork({
@@ -123,15 +67,80 @@ const isPositionLiquidatable = (
 
     const callData = encodeFunctionData({
       abi: MiniStableVault,
+      functionName: "liquidate",
+      args: [idPosition], 
+    });
+
+    // Write report
+    const reportResponse = runtime
+      .report({
+        encodedPayload: hexToBase64(callData),
+        encoderName: "evm",
+        signingAlgo: "ecdsa",
+        hashingAlgo: "keccak256",
+      })
+      .result();
+
+    const resp = evmClient
+      .writeReport(runtime, {
+        receiver: evmConfig.mintStableConsumerAddress as Address,
+        report: reportResponse,
+        gasConfig: {
+          gasLimit: evmConfig.gasLimit,
+        },
+      })
+      .result();
+
+      const txtStatus = resp.txStatus;
+      if (txtStatus !== TxStatus.SUCCESS) {
+        throw new Error(`Failed to write report: ${resp.errorMessage || txtStatus}`);
+      }
+
+      const txHash = resp.txHash || new Uint8Array(32);
+      runtime.log(`Liquidate transaction succeeded at txHash: ${bytesToHex(txHash)}`);
+
+    return true;
+  } catch (error) {
+    runtime.log(`Error in liquidatePosition: ${error}`);
+    return false;
+  }
+};
+
+const mustBeLiquidated = (
+  runtime: Runtime<Config>,
+  evmConfig: Config["evms"][0]
+): { liquidatable: boolean; idPosition: bigint } => {
+  const idPosition = 2n; // hardcoded position ID for demo purposes
+
+  try {
+
+    const network = getNetwork({
+      chainFamily: "evm",
+      chainSelectorName: evmConfig.chainSelectorName,
+      isTestnet: true,
+    });
+
+    if (!network) {
+      throw new Error(
+        `Network not found for chain selector name: ${evmConfig.chainSelectorName}`
+      );
+    }
+
+    const evmClient = new cre.capabilities.EVMClient(
+      network.chainSelector.selector
+    );
+
+    const callData = encodeFunctionData({
+      abi: MiniStableVault,
       functionName: "needsLiquidation",
-      args: [2n],
+      args: [idPosition],
     });
 
     const contractCall = evmClient
       .callContract(runtime, {
         call: encodeCallMsg({
           from: zeroAddress,
-          to: evmConfig.minStableVaultAddress as Address,
+          to: evmConfig.mintStableConsumerAddress as Address,
           data: callData,
         }),
         blockNumber: LATEST_BLOCK_NUMBER,
@@ -142,14 +151,14 @@ const isPositionLiquidatable = (
       abi: MiniStableVault,
       functionName: "needsLiquidation",
       data: bytesToHex(contractCall.data),
-    });
+    }) as boolean;
 
     runtime.log(`Liquidatable: ${liquidatable}`);
 
-    return liquidatable;
+    return {liquidatable: liquidatable, idPosition: idPosition};
   } catch (error) {
     runtime.log(`Error in isPositionLiquidatable: ${error}`);
-    return false;
+    return {liquidatable: false, idPosition: idPosition};
   }
 };
 
